@@ -2,14 +2,6 @@ from torch import Tensor, tensor, empty, cat, arange, int64
 from torch_sparse import SparseTensor
 from typing import Optional
 
-
-class edges:
-    def __init__(self):
-        self.U = empty(0)
-        self.V = empty(0)
-        self.values = None
-        
-
 class graphTorch():
     
     def __init__(self):
@@ -18,6 +10,9 @@ class graphTorch():
         self.edge_data = {}
         self._counter = 0
         
+    def get_nodes_num(self):
+        return self.node_identifiers.shape[0]
+    
     def get_node_IDs(self):
         return self.node_identifiers
     
@@ -33,7 +28,12 @@ class graphTorch():
     
     def get_edges(self, edge_type: str):
         assert (edge_type in self.edge_data), "the given key does not exist"
-        return self.edge_data[edge_type]
+        adj = self.edge_data[edge_type]
+        U = adj.storage.row()
+        V = adj.storage.col()
+        values = adj.storage.value()
+        return U, V, values
+        
                 
     def add_nodes(self, nodes_data: dict):
         new_node_identifiers = arange(self._counter, self._counter + len(nodes_data[next(iter(nodes_data))]))
@@ -47,42 +47,57 @@ class graphTorch():
                     assert (data.shape[0] == self.node_identifiers.shape[0]), "number of nodes must be equal"
                 self.node_data[node_data_type] = data  
     
-    def add_edges(self, edge_type: str, U: Tensor, V: Tensor, directed: bool, values: Optional[Tensor] = None):
+    def add_edges(self, edge_type: str, U: Tensor, V: Tensor, directed: bool, edge_weights: Optional[Tensor] = None):
         if directed == False:
             a = cat((U,V), dim = 0)
             b = cat((V,U), dim = 0)
             U,V = a, b
-        N = self.node_identifiers.shape[0]
+        N = self.get_nodes_num()
         if edge_type not in self.edge_data:
-            self.edge_data[edge_type] = edges()
-            self._assign_processed_edges(edge_type = edge_type, row = U, col = V, N = N, v = values)
+            self.edge_data[edge_type] = SparseTensor(row=U, col=V, sparse_sizes=(N, N), value = edge_weights).coalesce()
         else:
-            if (self.edge_data[edge_type].values == None) and (self.edge_data[edge_type].U != 0):
-                raise "the given edge_type is weighted"
-            row = cat((self.edge_data[edge_type].U, U), dim = 0)
-            col = cat((self.edge_data[edge_type].V, V), dim = 0)
-            if values is not None:
-                values = cat((self.edge_data[edge_type].values, values), dim = 0)
-            self._assign_processed_edges(edge_type, row = U, col = V, N = N, v = values)
+            r,c,v = self.get_edges(edge_type)
+            if self.edge_data[edge_type].storage.value() != None:
+                raise "the given edge_type must be weighted"
+            new_row = cat((r, U), dim = 0)
+            new_col = cat((c, V), dim = 0)
+            if edge_weights is not None:
+                v = cat((v, edge_weights), dim = 0)
+            self.edge_data[edge_type] = SparseTensor(row=new_row, 
+                                                     col=new_col, 
+                                                     sparse_sizes=(N, N), 
+                                                     value = v).coalesce()
             
     def delete_edges(self, edge_type: str, U: Tensor, V: Tensor):
-        E = cat((self.edge_data[edge_type].U.unsqueeze(0), self.edge_data[edge_type].V.unsqueeze(0)),dim=0).T
+        assert (edge_type in self.edge_data), "the given key does not exist"
+        N = self.get_nodes_num()
+        r,c,v = self.get_edges(edge_type)
+        E = cat((r.unsqueeze(0), c.unsqueeze(0)),dim=0).T
         Erem = cat((U.unsqueeze(0), V.unsqueeze(0)), dim=0).T
         mask = E.unsqueeze(1) == Erem
         mask = mask.all(-1)
         non_repeat_mask = ~mask.any(-1)
-        self._change_edge_state(edge_type = edge_type, mask = non_repeat_mask)
+        if v is not None:
+            v = v[non_repeat_mask]
+        self.edge_data[edge_type] = SparseTensor(row=r[non_repeat_mask], 
+                                                 col=c[non_repeat_mask], 
+                                                 sparse_sizes=(N, N), 
+                                                 value = v).coalesce()
     
     def delete_nodes(self, node_identifiers: Optional[Tensor] = None, relative_node_indices: Optional[Tensor] = None):
         assert ((node_identifiers != None) ^ (relative_node_indices != None)), "Either node_identifiers, or relative_node_indices have to be provided"
         if node_identifiers != None:
             relative_node_indices = self.get_relative_node_indices(node_identifiers)
         relative_node_indices = cat((relative_node_indices.unsqueeze(0),relative_node_indices.unsqueeze(0)), dim = 0).T
+        N = self.get_nodes_num()
         for key in self.edge_data:
-            E = cat((self.edge_data[key].U.unsqueeze(0), self.edge_data[key].V.unsqueeze(0)), dim=0).T
+            r,c,v = self.get_edges(key)
+            E = cat((r.unsqueeze(0), c.unsqueeze(0)), dim=0).T
             mask = (E.unsqueeze(1) == relative_node_indices).any(-1).any(-1)
-            self._change_edge_state(edge_type = key, mask = mask)
-        nodes_with_new_relative_indices = arange(self.node_identifiers.shape[0] - relative_node_indices.shape[0], self.node_identifiers.shape[0])
+            if v is not None:
+                v = v[mask]
+            self.edge_data[key] = SparseTensor(row=r[mask], col=c[mask], sparse_sizes=(N, N), value = v).coalesce()
+        nodes_with_new_relative_indices = arange(self.node_identifiers.shape[0] - relative_node_indices.shape[0], N)
         for ind, elm in enumerate(relative_node_indices[:,0]):
             self.node_identifiers[elm] = self.node_identifiers[-1]
             self.node_identifiers = self.node_identifiers[:-1]
@@ -90,21 +105,13 @@ class graphTorch():
                 self.node_data[k][elm] = self.node_data[k][-1]
                 self.node_data[k] = self.node_data[k][:-1]
             for k in self.edge_data:
-                Umask = self.edge_data[k].U == nodes_with_new_relative_indices[-(ind+1)]
-                Vmask = self.edge_data[k].V == nodes_with_new_relative_indices[-(ind+1)]
-                self.edge_data[k].U[Umask] = elm
-                self.edge_data[k].V[Vmask] = elm
+                r,c,v = self.get_edges(k)
+                Umask = r == nodes_with_new_relative_indices[-(ind+1)]
+                Vmask = c == nodes_with_new_relative_indices[-(ind+1)]
+                r[Umask] = elm
+                c[Vmask] = elm
+                self.edge_data[k] = SparseTensor(row=r, 
+                                                 col=c, 
+                                                 sparse_sizes=(N, N), 
+                                                 value = v).coalesce()
 
-        
-    def _assign_processed_edges(self,edge_type:str, row: Tensor, col: Tensor, N: int, v: Optional[Tensor]):
-        adj = SparseTensor(row=row, col=col, sparse_sizes=(N, N), value = v).coalesce()
-        self.edge_data[edge_type].U = adj.storage.row()
-        self.edge_data[edge_type].V = adj.storage.col()
-        if v is not None:
-            self.edge_data[edge_type].values = adj.storage.value() 
-            
-    def _change_edge_state(self, edge_type: str, mask: Tensor):
-        self.edge_data[edge_type].U = self.edge_data[edge_type].U[mask]
-        self.edge_data[edge_type].V = self.edge_data[edge_type].V[mask]
-        if self.edge_data[edge_type].values is not None:
-            self.edge_data[edge_type].values = self.edge_data[edge_type].values[mask]
