@@ -2,7 +2,7 @@ from torch import Tensor, tensor, empty, cat, arange, int64
 from torch_sparse import SparseTensor
 from typing import Optional
 
-class graphTorch():
+class dynamicGraph():
     
     def __init__(self):
         self.node_identifiers = empty(0, dtype = int64)
@@ -114,4 +114,3 @@ class graphTorch():
                                                  col=c, 
                                                  sparse_sizes=(N, N), 
                                                  value = v).coalesce()
-
