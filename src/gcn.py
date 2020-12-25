@@ -20,6 +20,7 @@ class GCN_layer(Module):
     def __init__(self, 
                  in_channels: int, 
                  out_channels: int, 
+                 activation_function,
                  add_self_loops: bool = True,
                  weight_init = glorot
                 ):
@@ -29,6 +30,7 @@ class GCN_layer(Module):
         self.add_self_loops = add_self_loops
         self.weights = Parameter(data = Tensor(in_channels, out_channels))
         weight_init(self.weights)
+        self.activation_function = activation_function
     
     
     def forward(self, X: Tensor, edges: SparseTensor):
@@ -36,5 +38,5 @@ class GCN_layer(Module):
         A_hat = gcn_norm(adj = edges, 
                          add_self_loops = self.add_self_loops
                         )
-        out = matmul(A_hat, X) @ self.weights
+        out = self.activation_function(matmul(A_hat, X) @ self.weights)
         return out
