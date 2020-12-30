@@ -10,6 +10,9 @@ class dynamicGraph():
         self.edge_data = {}
         self._counter = 0
         
+    def __len__(self):
+        return self.node_identifiers.shape[0]
+        
     def get_nodes_num(self):
         return self.node_identifiers.shape[0]
     
