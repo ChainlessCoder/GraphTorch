@@ -49,8 +49,12 @@ class UnweightedNode2vecSampler():
             batch = tensor(batch)
         return self.pos_sample(batch), self.neg_sample(batch)
     
-    def generator(self, **kwargs):
-        return DataLoader(arange(self.graph.edge_data[self.edge_type].sparse_size(0)),
-                          collate_fn=self.sample, **kwargs)
+    def generator(self, **kwargs, batch = None):
+        if isinstance(batch, None):
+            return DataLoader(arange(self.graph.edge_data[self.edge_type].sparse_size(0)),
+                              collate_fn=self.sample, **kwargs)
+        elif not isinstance(batch, Tensor):
+            batch = tensor(batch)
+        return DataLoader(batch, collate_fn=self.sample, **kwargs)
     
     
