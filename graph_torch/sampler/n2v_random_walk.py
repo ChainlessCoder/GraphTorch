@@ -1,4 +1,4 @@
-from torch tensor, Tensor, cat, randint, arange
+from torch import tensor, Tensor, cat, randint, arange
 from torch_cluster import random_walk
 from torch.utils.data import DataLoader
 
