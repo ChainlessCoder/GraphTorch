@@ -1,5 +1,6 @@
 from torch.nn import Module, Parameter
 from torch.nn.functional import embedding
+from torch log, sigmoid
 
 eps = 1e-15
 
@@ -24,7 +25,7 @@ class node2vec_layer(Module):
                                                                  self.w.shape[1])
 
         out = (h_start * h_rest).sum(dim=-1).view(-1)
-        pos_loss = -torch.log(torch.sigmoid(out) + eps).mean()
+        pos_loss = -log(sigmoid(out) + eps).mean()
 
         # Negative loss.
         start, rest = neg_rw[:, 0], neg_rw[:, 1:].contiguous()
@@ -35,7 +36,7 @@ class node2vec_layer(Module):
                                                                  self.w.shape[1])
 
         out = (h_start * h_rest).sum(dim=-1).view(-1)
-        neg_loss = -torch.log(1 - torch.sigmoid(out) + eps).mean()
+        neg_loss = -log(1 - sigmoid(out) + eps).mean()
 
         return pos_loss + neg_loss
     
