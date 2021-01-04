@@ -1,6 +1,6 @@
 from torch.nn import Module, Parameter
 from torch.nn.functional import embedding
-from torch log, sigmoid
+from torch import log, sigmoid
 
 eps = 1e-15
 
