@@ -1,4 +1,5 @@
 from torch import Tensor, tensor, empty, cat, arange, int64
+from torch.nn import Parameter
 from torch_sparse import SparseTensor
 from typing import Optional
 
@@ -44,11 +45,12 @@ class dynamicGraph():
         self._counter += len(new_node_identifiers)
         for node_data_type, data in nodes_data.items():
             if node_data_type in self.node_data:
-                self.node_data[node_data_type] = cat((self.node_data[node_data_type], data), dim=0)
+                self.node_data[node_data_type] = Parameter(data = cat((self.node_data[node_data_type], data), dim=0),
+                                                           requires_grad = True)
             else:
                 if self.node_identifiers.shape[0] != 0:
                     assert (data.shape[0] == self.node_identifiers.shape[0]), "number of nodes must be equal"
-                self.node_data[node_data_type] = data  
+                self.node_data[node_data_type] = Parameter(data = data, requires_grad = True)  
     
     def add_edges(self, edge_type: str, U: Tensor, V: Tensor, directed: bool, edge_weights: Optional[Tensor] = None):
         if directed == False:
