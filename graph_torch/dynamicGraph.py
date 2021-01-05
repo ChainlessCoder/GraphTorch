@@ -62,8 +62,8 @@ class dynamicGraph():
             self.edge_data[edge_type] = SparseTensor(row=U, col=V, sparse_sizes=(N, N), value = edge_weights).coalesce()
         else:
             r,c,v = self.get_edges(edge_type)
-            if self.edge_data[edge_type].storage.value() != None:
-                raise "the given edge_type must be weighted"
+            if (self.edge_data[edge_type].storage.value() != None) ^ (edge_weights != None):
+                raise "edge_weights have to be consistent"
             new_row = cat((r, U), dim = 0)
             new_col = cat((c, V), dim = 0)
             if edge_weights is not None:
