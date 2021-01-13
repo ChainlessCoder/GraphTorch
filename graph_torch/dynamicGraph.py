@@ -1,4 +1,4 @@
-from torch import Tensor, tensor, empty, cat, arange, int64
+from torch import Tensor, tensor, empty, cat, arange, logical_and, int64
 from torch.nn import Parameter
 from torch_sparse import SparseTensor
 from typing import Optional
@@ -119,3 +119,26 @@ class dynamicGraph():
                                                  col=c, 
                                                  sparse_sizes=(N, N), 
                                                  value = v).coalesce()
+    
+    
+    def set_value(self, edge_type: str, value: Tensor):
+        self.edge_data[edge_type] = self.edge_data[edge_type].set_value(value, layout = 'coo')
+        return
+    
+    def add_value2edge(self, values, value):
+        return values + value
+    
+    def set_value2edge(self, values, value):
+        return value
+    
+    def update_edge_weight(self, edge_type: str, u: int, v: int, value, operation, **kargs):
+        mask = logical_and(self.edge_data[edge_type].storage._row == u,
+                           self.edge_data[edge_type].storage._col == v
+                          )
+        self.edge_data[edge_type].storage._value[mask] = operation(values = self.edge_data[edge_type].storage._value[mask],
+                                                                   value = value,
+                                                                   *kargs
+                                                                  )
+    
+    #def update_edge_weights()
+    
