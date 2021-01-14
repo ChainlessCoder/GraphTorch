@@ -140,5 +140,14 @@ class dynamicGraph():
                                                                    *kargs
                                                                   )
     
-    #def update_edge_weights()
+    def update_multiple_edge_weights(self, edge_type: str, U: Tensor, V: Tensor, values, operation, **kargs):
+        internal_U, internal_V, internal_values = self.get_edges(edge_type)
+        internal_edges = cat((internal_U.unsqueeze(1),internal_V.unsqueeze(1)),dim=1)
+        edges2change = cat((U.unsqueeze(1),V.unsqueeze(1)),dim=1)
+        indices2change = arange(len(internal_U)).repeat(len(U),1)[((internal_edges == edges2change.unsqueeze(1)).sum(2) == 2)]
+        self.edge_data[edge_type].storage._value[indices2change] = operation(values = self.edge_data[edge_type].storage._value[indices2change],
+                                                                             value = values,
+                                                                             *kargs
+                                                                            )
+        
     
