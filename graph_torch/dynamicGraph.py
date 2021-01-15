@@ -1,4 +1,4 @@
-from torch import Tensor, tensor, empty, cat, arange, logical_and, int64
+from torch import Tensor, tensor, empty, cat, arange, logical_and, logical_or, int64
 from torch.nn import Parameter
 from torch_sparse import SparseTensor
 from typing import Optional
@@ -125,27 +125,22 @@ class dynamicGraph():
         self.edge_data[edge_type] = self.edge_data[edge_type].set_value(value, layout = 'coo')
         return
     
-    def add_value2edge(self, values, value):
-        return values + value
-    
-    def set_value2edge(self, values, value):
-        return value
-    
     def update_edge_weight(self, edge_type: str, u: int, v: int, value, operation, **kargs):
-        mask = logical_and(self.edge_data[edge_type].storage._row == u,
-                           self.edge_data[edge_type].storage._col == v
+        internal_U, internal_V, internal_values = self.get_edges(edge_type)
+        mask = logical_and(internal_U == u,
+                           internal_V == v
                           )
-        self.edge_data[edge_type].storage._value[mask] = operation(values = self.edge_data[edge_type].storage._value[mask],
+        self.edge_data[edge_type].storage._value[mask] = operation(values = internal_values[mask],
                                                                    value = value,
                                                                    *kargs
                                                                   )
     
     def update_multiple_edge_weights(self, edge_type: str, U: Tensor, V: Tensor, values, operation, **kargs):
-        internal_U, internal_V, _ = self.get_edges(edge_type)
+        internal_U, internal_V, internal_values = self.get_edges(edge_type)
         internal_edges = cat((internal_U.unsqueeze(1),internal_V.unsqueeze(1)),dim=1)
         edges2change = cat((U.unsqueeze(1),V.unsqueeze(1)),dim=1)
         indices2change = arange(len(internal_U)).repeat(len(U),1)[((internal_edges == edges2change.unsqueeze(1)).sum(2) == 2)]
-        self.edge_data[edge_type].storage._value[indices2change] = operation(values = self.edge_data[edge_type].storage._value[indices2change],
+        self.edge_data[edge_type].storage._value[indices2change] = operation(values = internal_values[indices2change],
                                                                              value = values,
                                                                              *kargs
                                                                             )
@@ -157,3 +152,20 @@ class dynamicGraph():
     def get_incoming(self, edge_type: str, node_index: int):
         U, V, _ = self.get_edges(edge_type)
         return U[V == node_index]
+    
+    def get_node_edges(self, edge_type: str, node_index: int):
+        U, V, _ = self.get_edges(edge_type)
+        edges = cat((U.unsqueeze(0),V.unsqueeze(0)), dim=0)
+        mask = logical_or(U == node_index,
+                          V == node_index
+                         )
+        return edges[:,mask]
+
+    
+class edge_updates:
+    
+    def add2edge_value(self, values, value):
+        return values + value
+    
+    def set_edge_value(self, values, value):
+        return value
