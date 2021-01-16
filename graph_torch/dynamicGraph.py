@@ -145,21 +145,42 @@ class dynamicGraph():
                                                                              *kargs
                                                                             )
         
-    def get_outgoing(self, edge_type: str, node_index: int):
+    def get_outgoing_nodes(self, edge_type: str, node_index):
         U, V, _ = self.get_edges(edge_type)
-        return V[U == node_index]
+        if isinstance(node_index, int):
+            return V[U == node_index]
+        if isinstance(node_index, list):
+            node_index = tensor(node_index)
+        rU = U.repeat(len(node_index), 1)
+        mask = rU == node_index.unsqueeze(1)
+        return V.repeat(len(node_index), 1)[mask]
         
-    def get_incoming(self, edge_type: str, node_index: int):
+    def get_incoming_nodes(self, edge_type: str, node_index):
         U, V, _ = self.get_edges(edge_type)
-        return U[V == node_index]
+        if isinstance(node_index, int):
+            return U[V == node_index]
+        if isinstance(node_index, list):
+            node_index = tensor(node_index)
+        rV = V.repeat(len(node_index), 1)
+        mask = rV == node_index.unsqueeze(1)
+        return U.repeat(len(node_index), 1)[mask]
     
-    def get_node_edges(self, edge_type: str, node_index: int):
+    def get_node_edges(self, edge_type: str, node_index):
         U, V, _ = self.get_edges(edge_type)
-        edges = cat((U.unsqueeze(0),V.unsqueeze(0)), dim=0)
-        mask = logical_or(U == node_index,
-                          V == node_index
+        if isinstance(node_index, int):
+            edges = cat((U.unsqueeze(0),V.unsqueeze(0)), dim=0)
+            mask = logical_or(U == node_index,
+                              V == node_index
+                             )
+            return U[mask], V[mask]
+        if isinstance(node_index, list):
+            node_index = tensor(node_index)
+        umask = (U == node_index.unsqueeze(1)).sum(0)
+        vmask = (V == node_index.unsqueeze(1)).sum(0)
+        mask = logical_or((U == node_index.unsqueeze(1)).sum(0), 
+                          (V == node_index.unsqueeze(1)).sum(0)
                          )
-        return edges[:,mask]
+        return U[mask], V[mask]
 
     
 class edge_updates:
