@@ -182,7 +182,7 @@ class dynamicGraph():
                          )
         if v is not None:
             return U[mask], V[mask], values[mask]
-        return U[mask], V[mask]
+        return U[mask], V[mask], None
 
     
 class edge_updates:
