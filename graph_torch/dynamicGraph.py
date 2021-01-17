@@ -166,7 +166,7 @@ class dynamicGraph():
         return U.repeat(len(node_index), 1)[mask]
     
     def get_node_edges(self, edge_type: str, node_index):
-        U, V, _ = self.get_edges(edge_type)
+        U, V, values = self.get_edges(edge_type)
         if isinstance(node_index, int):
             edges = cat((U.unsqueeze(0),V.unsqueeze(0)), dim=0)
             mask = logical_or(U == node_index,
@@ -180,6 +180,8 @@ class dynamicGraph():
         mask = logical_or((U == node_index.unsqueeze(1)).sum(0), 
                           (V == node_index.unsqueeze(1)).sum(0)
                          )
+        if v is not None:
+            return U[mask], V[mask], values[mask]
         return U[mask], V[mask]
 
     
