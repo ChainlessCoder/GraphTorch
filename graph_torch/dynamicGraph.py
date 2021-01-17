@@ -180,7 +180,7 @@ class dynamicGraph():
         mask = logical_or((U == node_index.unsqueeze(1)).sum(0), 
                           (V == node_index.unsqueeze(1)).sum(0)
                          )
-        if v is not None:
+        if values is not None:
             return U[mask], V[mask], values[mask]
         return U[mask], V[mask], None
 
